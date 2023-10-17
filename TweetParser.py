@@ -8,15 +8,19 @@ import math
 #parameters
 # the path to your local directory containing all project files
 rt = r'path/to/your/project/output/directory'
+
 #your desired Esri file geodatabase name that contains the project geographic feature layers and data tables
 fgdbname = 'GeospatialTweetAnalysis.gdb'
+
 # keywords to search Twitter regarding the COVID-19 virus
 content = 'covid OR corona OR coronavirus OR pandemic OR outbreak OR epidemic' 
+
 # specify start and end date of tweets to be collected on the above topics
 start_date = '2020-09-01'
 end_date = '2020-12-31'
 
 def create_filegdb(rt, fgdbname):
+    
     """
     This function creates an empty Esri file geodatabase to store the project geographic feature classes. 
 
@@ -27,6 +31,7 @@ def create_filegdb(rt, fgdbname):
     OUTPUTS: 
     an empty Esri file geodatabase with the specified name in the specified directory!
     """
+    
     fgdbdir=rt+'\\'+fgdbname
     if not os.path.isdir(fgdbdir):
         arcpy.CreateFileGDB_management(rt, fgdbname)
@@ -49,6 +54,7 @@ def create_search_centers(rt, fgdbname):
     
     # connect to the existing Esri file geodatabase contaning the search buffers
     fgdb = create_filegdb(rt, fgdbname)
+    
     #and set it as the main workspace 
     arcpy.env.workspace = fgdb
     
@@ -57,8 +63,10 @@ def create_search_centers(rt, fgdbname):
     
     #change name of cities to aligh
     citypoints['NAME'] = citypoints['NAME'] + ' City'
+    
     #specify column names to use 
     usecols=['ST','cir_cen_x','cir_cen_y','cir_radius_m','NAME']
+    
     # concatenate the state and city dataframes 
     points = pd.concat([statepoints.rename({'STUSPS':'ST'}, axis=1)[usecols],
                         citypoints[usecols]], axis=0)
@@ -66,6 +74,7 @@ def create_search_centers(rt, fgdbname):
 
     
 def parse_tweets(points, start_date, end_date, content):
+    
     """
     This function searches Twitter based on the specified contents and date interval. 
 
@@ -94,6 +103,7 @@ def parse_tweets(points, start_date, end_date, content):
                                                      10**10))[['user', 'date','content']]
             #add user location  
             df_coord['user_location'] =  df_coord['user'].apply(lambda x: x['location'])
+            
             #add a location column to the df based on my search
             df_coord['searched_location'] = row['ST']
             
@@ -106,13 +116,16 @@ def parse_tweets(points, start_date, end_date, content):
 
     #merge all the data 
     full_df = pd.concat(dfs2)
+    
     #save it all as a csv 
     COVID_df.to_csv(rt + '\\AllTweets.csv')
     
     
 if __name__ == '__main__':
+    
     print('----Process Started----')
     start = time.time()
+    
     #define below parameter to keep track of total processing time! 
     totalT = 0  
 
