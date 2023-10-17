@@ -77,7 +77,7 @@ def data_to_gdbtable(fgdb, df, outname):
     names = df.dtypes.index.tolist()
     arr.dtype.names = tuple(names)
     #convert the numpy array to a gdp table
-    arcpy.da.NumPyArrayToTable(arr, fgdb+'\\'+outname)
+    arcpy.da.NumPyArrayToTable(arr, fgdb+'\\' + outname)
     return outname
 
 
@@ -110,7 +110,7 @@ def create_city_buffers(cpp_shp, fgdbname):
     boundaries.
 
     INPUTS:
-    cpp_shp: directory of the Esri file geodatabase that will host the new file geodatabase table
+    cpp_shp: directory of the Esri shapefile that containing most US populous cities data
     fgdbname: the name of the Esri file geodatabase to store all the information in it
 
     OUTPUTS: 
@@ -118,24 +118,31 @@ def create_city_buffers(cpp_shp, fgdbname):
     """
     #create the most populous cities geodataframe 
     gdf_cpp = find_most_populous_cities(cpp_shp)
+    
     #calculate min and max x, y in degrees
     df_bounds = gdf_cpp.geometry.bounds
+    
     #and convert lower left and upper right cornerts to UTM coordinates 
     df_bounds = convert_xy_epsg(df_bounds,'minx','miny', 4326, 3857)
     df_bounds = convert_xy_epsg(df_bounds,'maxx','maxy', 4326, 3857)
+    
     #now use the Pythagorean Theorem and UTM coordinations to calculate radius of the fitted circle 
     df_bounds['cir_cen_x'] = (df_bounds.maxx + df_bounds.minx) / 2
     df_bounds['cir_cen_y'] = (df_bounds.maxy + df_bounds.miny) / 2
+    
     #It is assumed the earth is flat here but which is reasonable for a city size scale. I checked with 
     #https://boulter.com/gps/distance/?from=60.733788+-150.281695+&to=61.483938+-148.460007&units=k
     #and it was very close with 129 km (above source) versu 133 km (this method)
     df_bounds['cir_radius_m'] = df_bounds.apply(lambda row: (((row.maxx3857 - row.minx3857)/2)**2 + 
                             ((row.maxy3857 - row.miny3857) / 2)**2)**0.5, axis = 1)
+    
     #concatenate the center geometries with radius to have the city points columns 
     gdf_citypoints = pd.concat([gdf_cpp.drop(columns = 'geometry'),
                               df_bounds[['cir_cen_x','cir_cen_y','cir_radius_m']]], axis = 1)
+    
     #create a file gdb to store the analysis outputs
     fgdb = create_filegdb(rt, fgdbname)
+    
     #and set it as the main workspace 
     arcpy.env.workspace = fgdb
 
@@ -144,6 +151,7 @@ def create_city_buffers(cpp_shp, fgdbname):
 
     #now convert the gdb into a file gdb
     table = data_to_gdbtable(fgdb, gdf_citypoints,'temp')
+    
     #convert the table into a point feature layer 
     _=arcpy.management.XYTableToPoint(table, 'CityPointsLyr',
                                       "cir_cen_x", "cir_cen_y", "#","#")
@@ -164,7 +172,7 @@ def create_state_buffers(state_shp, fgdbname):
     https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html
 
     INPUTS:
-    state_shp: directory of the shapefile that contains the most populous cities of US states
+    state_shp: directory of the shapefile that contains US states
     fgdbname: the name of the Esri file geodatabase to store all the information in it
 
     OUTPUTS: 
@@ -172,10 +180,14 @@ def create_state_buffers(state_shp, fgdbname):
     """
     #make state radius smaller to reduce inter-state overlaps
     gdf_States = gpd.read_file(state_shp, crs = {'init': 'epsg:4326'})
+    
     gdf_States['cir_cen_x'] = gdf_States.geometry.centroid.x
     gdf_States['cir_cen_y'] = gdf_States.geometry.centroid.y
+    
     gdf_States['cir_radius_m'] = 0.72*(gdf_States.ALAND/math.pi)**0.5
+    
     gdf_States['buff'] = gdf_States.cir_radius_m.astype(int).astype(str) + ' Meters'
+    
     table = data_to_gdbtable(fgdb, gdf_States[['STUSPS',"cir_cen_x", "cir_cen_y",
                                             'cir_radius_m','buff']],'temp')
     _ = arcpy.management.XYTableToPoint(table, 'StatePointsLyr',"cir_cen_x", 
@@ -188,6 +200,7 @@ def create_state_buffers(state_shp, fgdbname):
 if __name__ == '__main__':
     print('----Process Started----')
     start = time.time()
+    
     #define below parameter to keep track of total processing time! 
     totalT = 0  
 
